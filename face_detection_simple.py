@@ -18,12 +18,24 @@ CONFIDENCE_THRESHOLD = 0.5
 EMOTION_LABELS = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral'] 
 
 # --- WebRTC Configuration for Robustness (Fixes Cloud Deployment) ---
+
 RTC_CONFIGURATION = {
     "iceServers": [
+        # Public STUN servers (primary attempt, free)
         {"urls": ["stun:stun.l.google.com:19302"]},
         {"urls": ["stun:stun.services.mozilla.com"]},
+        
+        # TURN server (fallback for restrictive firewalls, requires credentials)
+        # UNCOMMENT AND FILL IN THE DETAILS BELOW IF STUN ALONE DOES NOT WORK
+        # {
+        #     "urls": "turn:YOUR_TURN_SERVER_URL:3478",  # E.g., turn:global.turn.twilio.com:3478?transport=udp
+        #     "username": "YOUR_USERNAME",               # E.g., the SID from your TURN provider
+        #     "credential": "YOUR_PASSWORD"               # E.g., the Auth Token or temporary password
+        # }
     ]
 }
+
+# The rest of the file remains the same...
 
 # --- Load Emotion Model ---
 @st.cache_resource
