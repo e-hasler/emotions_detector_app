@@ -1,18 +1,30 @@
-# Core Streamlit application and deployment
-streamlit
+# --- Core Application Dependencies ---
+streamlit==1.50.0
+streamlit-webrtc==0.63.11
+av==14.4.0
 
-# Real-time video processing integration
-streamlit-webrtc
+# --- Machine Learning and Computer Vision ---
+numpy==1.26.4
+tensorflow==2.16.2
+keras==3.10.0
+mediapipe==0.10.21
+opencv-python==4.11.0.86
+opencv-contrib-python==4.11.0.86
 
-# Tensor manipulation and Keras backend
-numpy
-tensorflow
-
-# Video frame handling (used by streamlit-webrtc)
-av
-
-# Computer Vision and image processing
-opencv-python
-
-# Face detection/landmark library
-mediapipe
+# --- Other Essential Dependencies from your list ---
+protobuf==4.25.8
+h5py==3.14.0
+grpcio==1.76.0
+absl-py==2.3.1
+astunparse==1.6.3
+flatbuffers==25.9.23
+gast==0.7.0
+google-crc32c==1.7.1
+google-pasta==0.2.0
+ml-dtypes==0.3.2
+opt_einsum==3.4.0
+tensorboard==2.16.2
+tensorboard-data-server==0.7.2
+termcolor==3.1.0
+tqdm==4.67.1
+wrapt==2.0.1
