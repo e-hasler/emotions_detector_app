@@ -3,14 +3,13 @@ streamlit==1.50.0
 streamlit-webrtc==0.63.11
 av==14.4.0
 
-# --- Machine Learning and Computer Vision ---
+# --- Machine Learning and Computer Vision (HEADLESS ONLY) ---
 numpy==1.26.4
 tensorflow==2.16.2
 keras==3.10.0
 mediapipe==0.10.21
-#opencv-python==4.11.0.86
-#opencv-contrib-python==4.11.0.86
-opencv-python-headless
+# This is the correct package for a server deployment:
+opencv-python-headless==4.11.0.86 
 
 # --- Other Essential Dependencies from your list ---
 protobuf==4.25.8
