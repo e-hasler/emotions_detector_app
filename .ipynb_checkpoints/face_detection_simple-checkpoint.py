@@ -6,6 +6,8 @@ import av
 import mediapipe as mp
 from threading import Lock
 import logging
+# ADDED 'os' for creating absolute paths
+import os 
 from tensorflow.keras.models import load_model
 
 # Suppress the ScriptRunContext warnings
@@ -15,16 +17,30 @@ logging.getLogger('streamlit.runtime.scriptrunner_utils.script_run_context').set
 CONFIDENCE_THRESHOLD = 0.5
 EMOTION_LABELS = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral'] 
 
+# --- WebRTC Configuration for Robustness (Fixes Cloud Deployment) ---
+RTC_CONFIGURATION = {
+    "iceServers": [
+        {"urls": ["stun:stun.l.google.com:19302"]},
+        {"urls": ["stun:stun.services.mozilla.com"]},
+    ]
+}
+
 # --- Load Emotion Model ---
 @st.cache_resource
 def load_emotion_model():
-    """Load the emotion detection model."""
+    """Load the emotion detection model using an absolute path."""
+    # Get the absolute path to the directory where this script is located
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    model_path = os.path.join(base_dir, 'original_cnn_best.keras')
+    
     try:
-        model = load_model('original_cnn_best.keras')
-        print("Emotion detection model loaded successfully!")
+        # Use the full, absolute path for guaranteed file loading
+        model = load_model(model_path)
+        print(f"Emotion detection model loaded successfully from: {model_path}")
         return model
     except Exception as e:
-        print(f"Error loading model: {e}")
+        # This will now show the absolute path that failed, which is great for debugging
+        print(f"Error loading model from {model_path}: {e}")
         return None
 
 emotion_model = load_emotion_model()
@@ -63,11 +79,8 @@ if 'captured_confidence' not in st.session_state:
 if 'capture_message' not in st.session_state:
     st.session_state.capture_message = ""
 
-
 if "last_bbox" not in st.session_state:
     st.session_state.last_bbox = None
-
-
 
 # --- MediaPipe Face Detection Setup ---
 @st.cache_resource
@@ -89,9 +102,8 @@ class FaceDetector(VideoProcessorBase):
         # Convert frame to numpy array
         img = frame.to_ndarray(format="bgr24") 
         
-        # Store frame in global variable (not session state)
+        # Store frame in global variable
         global_frame_store.set_frame(img)
-        print(f"Frame stored: {img.shape}")
 
         img_h, img_w, _ = img.shape
         
@@ -137,27 +149,22 @@ def analyse_face():
     # Get the latest frame from global storage
     captured_frame = global_frame_store.get_frame()
     
-    print(f"Analyse clicked - Frame is None: {captured_frame is None}")
-    if captured_frame is not None:
-        print(f"Frame shape: {captured_frame.shape}, size: {captured_frame.size}")
-    
     if captured_frame is not None and captured_frame.size > 0:
         # Convert the captured BGR frame to RGB format for correct Streamlit display
         captured_rgb = cv2.cvtColor(captured_frame, cv2.COLOR_BGR2RGB)
         st.session_state.display_frame = captured_rgb
         st.session_state.capture_message = "✅ Image captured successfully! See the result below."
-        print("SUCCESS: Image captured")
     else:
         st.session_state.display_frame = None
         st.session_state.capture_message = "⚠️ Could not capture a valid frame. Please ensure the webcam stream is active and try again."
-        print("FAILED: No valid frame")
 
 # --- Layout ---
 st.subheader("Live Camera Stream")
 webrtc_streamer(
     key="face-detection",
     video_processor_factory=FaceDetector, 
-    rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+    # Use the robust configuration
+    rtc_configuration=RTC_CONFIGURATION,
     media_stream_constraints={"video": True, "audio": False},
     async_processing=True,
 )
@@ -182,23 +189,44 @@ if st.session_state.display_frame is not None:
 
 
     # ------------ ANALYSE EMOTION OF THE CAPTURED IMAGE display_img ------------------------
-    processed_face = cv2.resize(display_img, (48, 48))
-    processed_face = processed_face.astype("float32") / 255.0
-    processed_face = np.expand_dims(processed_face, axis=0)
     
-    predictions = emotion_model.predict(processed_face, verbose=0)[0]
-    emotion_idx = np.argmax(predictions)
-    emotion_label = EMOTION_LABELS[emotion_idx]
-    emotion_confidence = np.max(predictions) * 100
+    # CHECK IF MODEL IS LOADED BEFORE CALLING .predict() (FIXES THE ATTRIBUTE ERROR)
+    if emotion_model is not None:
+        try:
+            # Preprocess the image for the emotion model (Corrected: No Grayscale)
+            processed_face = cv2.resize(display_img, (48, 48))
+            processed_face = processed_face.astype("float32") / 255.0
+            # Add batch dimension -> Shape becomes (1, 48, 48, 3)
+            processed_face = np.expand_dims(processed_face, axis=0)
+            
+            # Predict emotion
+            predictions = emotion_model.predict(processed_face, verbose=0)[0]
+            emotion_idx = np.argmax(predictions)
+            emotion_label = EMOTION_LABELS[emotion_idx]
+            emotion_confidence = np.max(predictions) * 100
+            
+            # Update session state with results
+            st.session_state.captured_emotion = emotion_label
+            st.session_state.captured_confidence = emotion_confidence
+            
+            print(f"Emotion: {emotion_label}, Confidence: {emotion_confidence:.2f}%")
+        
+        except Exception as e:
+            # Catch potential errors during prediction (e.g., shape mismatch)
+            st.error(f"Prediction failed with error: {e}")
+            print(f"Prediction Error: {e}")
+            st.session_state.captured_emotion = None
+            st.session_state.captured_confidence = None
     
-    st.session_state.captured_emotion = emotion_label
-    st.session_state.captured_confidence = emotion_confidence
-    
-    print(f"Emotion: {emotion_label}, Confidence: {emotion_confidence:.2f}%")
+    else:
+        # Display an error if the model failed to load
+        st.error("⚠️ Emotion model failed to load. Check your terminal for details.")
+        st.session_state.captured_emotion = None
+        st.session_state.captured_confidence = None
 
     # ------------ END OF EMOTION ANALYSIS ------------------------
     
-    # Draw green box around the face
+    # Draw green box around the image border (not the detected face)
     border_thickness = 3
     cv2.rectangle(display_img, (border_thickness, border_thickness), 
                   (w - border_thickness, h - border_thickness), 
@@ -207,7 +235,6 @@ if st.session_state.display_frame is not None:
     # Display emotion if available
     if st.session_state.captured_emotion is not None:
         emotion_text = f"{st.session_state.captured_emotion.upper()}: {st.session_state.captured_confidence:.1f}%"
-        print("st.session_state.captured_emotion is not None")
         
         # Put text with background for better visibility
         font = cv2.FONT_HERSHEY_SIMPLEX
@@ -230,5 +257,5 @@ st.markdown("""
 - **Green boxes** appear around detected faces
 - **Confidence scores** show detection certainty
 - Works in real-time with continuous video stream
-- Pressing **'Click to analyse'** captures the current frame and displays it below.
+- Pressing **'Click to analyse'** captures the current frame and displays it below with an emotion prediction.
 """)
