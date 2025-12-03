@@ -1,0 +1,18 @@
+# Core Streamlit application and deployment
+streamlit
+
+# Real-time video processing integration
+streamlit-webrtc
+
+# Tensor manipulation and Keras backend
+numpy
+tensorflow
+
+# Video frame handling (used by streamlit-webrtc)
+av
+
+# Computer Vision and image processing
+opencv-python
+
+# Face detection/landmark library
+mediapipe
